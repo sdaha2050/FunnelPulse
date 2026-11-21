@@ -6,7 +6,7 @@ A simple, demo-friendly multi-agent system: fake Expedia-style booking data stre
 
 > Fake data only. No real Expedia systems or traveler data are used.
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=REPLACE_WITH_REPO_URL)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/sdaha2050/FunnelPulse)
 
 ![TripSentry dashboard](docs/screenshot.png)
 
@@ -183,7 +183,7 @@ docker run -p 8000:8000 tripsentry
 ## Deploy to Render
 
 1. Push this repo to GitHub.
-2. In the README, replace `REPLACE_WITH_REPO_URL` with your repo URL (e.g. `https://github.com/you/tripsentry`).
+2. In the README, the Deploy button already points to `https://github.com/sdaha2050/FunnelPulse`.
 3. Click **Deploy to Render** above, or in Render: **New → Blueprint** → pick the repo. `render.yaml` creates one free Docker web service with health check `/api/health`.
 4. Wait for the build (~3–5 min), then open the `.onrender.com` URL.
 
