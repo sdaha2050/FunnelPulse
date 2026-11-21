@@ -103,4 +103,8 @@ if STATIC_DIR.exists():
     @app.get("/{path:path}")
     async def spa(path: str):
         file = STATIC_DIR / path
-        return FileResponse(file if path and file.is_file() else STATIC_DIR / "index.html")
+        if path and file.is_file():
+            return FileResponse(file)
+        # index.html must never be cached, so a new deploy shows up on a normal refresh
+        # (the hashed /assets files can be cached forever).
+        return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
