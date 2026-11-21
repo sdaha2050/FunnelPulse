@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Action, State } from "./types";
 import Regions from "./Regions";
+import Monthly from "./Monthly";
 
 // Each agent gets a color so the conversation feed is easy to follow.
 const AGENT_COLORS: Record<string, string> = {
@@ -24,11 +25,12 @@ const INCIDENT_BUTTONS: { type: string; label: string }[] = [
   { type: "country_3ds_failure", label: "UK bank check fails" },
 ];
 
-type Tab = "live" | "us" | "intl";
+type Tab = "live" | "us" | "intl" | "monthly";
 const TABS: { id: Tab; label: string }[] = [
   { id: "live", label: "Live agents" },
   { id: "us", label: "US by state" },
   { id: "intl", label: "International" },
+  { id: "monthly", label: "Monthly + top issues" },
 ];
 
 const STEPS = [
@@ -131,7 +133,7 @@ export default function App() {
 
       <nav className="tabs">
         {TABS.map((t) => {
-          const alerts = t.id === "live" ? 0 : s.regions[t.id].alerts;
+          const alerts = t.id === "us" || t.id === "intl" ? s.regions[t.id].alerts : 0;
           return (
             <button key={t.id} className={tab === t.id ? "on" : ""} onClick={() => setTab(t.id)}>
               {t.label}
@@ -141,7 +143,8 @@ export default function App() {
         })}
       </nav>
 
-      {tab !== "live" && <Regions kind={tab} data={s.regions[tab]} />}
+      {(tab === "us" || tab === "intl") && <Regions kind={tab} data={s.regions[tab]} />}
+      {tab === "monthly" && <Monthly />}
 
       {tab === "live" && (<>
 

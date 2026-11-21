@@ -140,3 +140,20 @@ table.regions .num { text-align: right; font-variant-numeric: tabular-nums; }
 table.regions tbody tr { cursor: pointer; }
 table.regions tbody tr:hover, table.regions tr.sel { background: #eff6ff; }
 p.small { font-size: 12px; }
+
+/* ---------- monthly dashboard ---------- */
+.monthbar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; }
+.monthbar select { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.kpi em { display: block; font-style: normal; font-size: 11px; margin-top: 2px; }
+.kpi em.up { color: var(--green); }
+.kpi em.down { color: var(--red); }
+svg.trend { width: 100%; height: auto; }
+.mini .mrow.wide { grid-template-columns: 130px 1fr 64px; }
+table.issues td { vertical-align: middle; }
+table.issues .stage { font-size: 11px; background: #eef2ff; color: #3730a3; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+table.issues .status { font-size: 11px; background: #f1f5f9; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.share { display: inline-block; width: 70px; height: 8px; background: #f1f5f9; border-radius: 99px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
+.share div { height: 100%; background: var(--red); }
+tr.detail td { background: #f8fafc; }
+.rc { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; padding: 6px 0; font-size: 13px; line-height: 1.4; }
+.rc span { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }

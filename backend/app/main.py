@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from app import monthly
 from app.engine import TICK_SECONDS, Engine
 
 engine = Engine(auto_incidents=os.environ.get("AUTO_INCIDENTS", "1") == "1")
@@ -42,6 +43,12 @@ class KillSwitch(BaseModel):
     global_on: bool | None = None
     action_type: str | None = None
     on: bool | None = None
+
+
+@app.get("/api/monthly")
+def get_monthly():
+    """12 months of simulated history + the top issues behind booking drops."""
+    return monthly.build()
 
 
 @app.get("/api/health")

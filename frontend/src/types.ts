@@ -116,3 +116,44 @@ export interface RegionRollup {
   alerts: number;
   rows: RegionRow[];
 }
+
+export interface MonthRow {
+  month: string;
+  label: string;
+  partial: boolean;
+  searches: number;
+  bookings: number;
+  conversion: number;
+  revenue_usd: number;
+  stages: number[];
+  lost_by_issue: Record<string, number>;
+  lost_bookings: number;
+}
+
+export interface MonthlyIssue {
+  id: string;
+  rank: number;
+  title: string;
+  stage: string;
+  root_cause: string;
+  evidence: string;
+  found_by: string;
+  owner: string;
+  fix: string;
+  status: string;
+  lost_bookings: number;
+  lost_revenue_usd: number;
+  share_of_loss: number;
+  change_vs_prev: number | null;
+  trend: number[];
+  year_lost_revenue_usd: number;
+}
+
+export interface MonthlyData {
+  note: string;
+  stage_labels: string[];
+  avg_booking_usd: number;
+  months: MonthRow[];
+  ranked_on: string;
+  issues: MonthlyIssue[];
+}

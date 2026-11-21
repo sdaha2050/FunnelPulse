@@ -26,6 +26,27 @@ A simple, demo-friendly multi-agent system: fake Expedia-style booking data stre
 8. **US by state** tab: a tile map of US states (traffic share ~60%), colored Normal / Watch / Problem, with KPIs, a per-state funnel vs the US average, and a table of every state.
 9. **International** tab: the same view by country (UK, Germany, France, Canada, Mexico, Japan, Australia, Spain, India).
 
+10. **Monthly + top issues** tab: 12 months of simulated history (searches, bookings, conversion, booking value, lost bookings), a month picker, where bookings are lost by stage, and the **top 10 issues ranked by lost bookings**, each with root cause, evidence, which agent found it, fix, owner, status and a 12-month trend.
+
+### Top 10 issues (simulated, ranked on the last full month)
+
+| # | Issue | Stage | Root cause | Fix |
+| --- | --- | --- | --- | --- |
+| 1 | Taxes and resort fees appear only at checkout | Checkout | Search and property pages show the nightly rate without mandatory fees; the total jumps 15-25% at checkout | Show the all-in total price upfront |
+| 2 | Searches with no or only sold-out results | Detail | Inventory gaps on peak dates in top destinations | Add supply; suggest nearby dates and areas |
+| 3 | Card payments declined by the bank | Payment | 3-D Secure challenges fail (EU/UK cards); cross-border declines | Smart routing to a second processor; frictionless 3-D Secure |
+| 4 | Price changes between property page and checkout | Checkout | Cached rate on the property page vs live rate at checkout | Refresh the rate on page load; hold the price 15 minutes |
+| 5 | "No longer available" when booking | Booked | Availability cache refreshes every 30 minutes; last rooms sell first | Live availability check when checkout starts |
+| 6 | Android checkout form rejects valid details | Checkout | Phone and postcode validation only accepts US formats | Hotfix validation; add form-error checks to releases |
+| 7 | Real travelers blocked by fraud checks | Payment | New rule flags first-time travelers on new devices or VPNs | Step-up verification instead of a hard block |
+| 8 | Slow property pages on the mobile app | Detail | Large photos; pages take over 4s on cellular | Image compression and lazy loading |
+| 9 | Forced sign-in before checkout | Checkout | A/B test turned off guest checkout | Stop the variant; sign in after booking |
+| 10 | Suppliers don't confirm bookings in time | Supplier confirmed | Channel-manager API slows at peak | Agent auto-retries (Tier 2) + partner escalation |
+
+Lost bookings count only travelers who would normally have gone on to book (an early-stage drop is multiplied by the downstream conversion rate). Served by `GET /api/monthly`.
+
+![Monthly dashboard](docs/monthly_dashboard.png)
+
 ### Regional dashboards
 
 | | US by state | International |
