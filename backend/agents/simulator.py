@@ -26,7 +26,12 @@ STAGE_LABELS = {
 BASE_RATES = {"search": 0.45, "detail": 0.40, "checkout": 0.75, "payment": 0.92}
 
 BRANDS = [("Expedia", 5), ("Hotels.com", 3), ("Vrbo", 2)]
-MARKETS = [("US", 5), ("UK", 2), ("DE", 2), ("JP", 1)]
+# Country codes (ISO-2). The US gets most traffic, like a real US-based OTA.
+MARKETS = [("US", 60), ("GB", 12), ("DE", 7), ("FR", 5), ("CA", 4), ("MX", 3),
+           ("JP", 3), ("AU", 2), ("ES", 2), ("IN", 2)]
+# Where US travelers book from (state codes).
+US_STATES = [("CA", 22), ("TX", 13), ("FL", 12), ("NY", 11), ("WA", 7), ("IL", 6),
+             ("NV", 5), ("GA", 5), ("MA", 4), ("NC", 4), ("CO", 4), ("AZ", 4), ("HI", 3)]
 DEVICES = [("Web", 4), ("iOS app", 3), ("Android app", 3)]
 SUPPLIERS = [("SunStay Hotels", 3), ("Harbor Inns", 3), ("Alpine Lodges", 2), ("CityNest", 2)]
 PAYMENTS = [("Visa", 4), ("Mastercard", 3), ("Amex", 3), ("PayPal", 1)]
@@ -47,7 +52,16 @@ INCIDENTS = {
     "tracking_outage": {
         "label": "Android app tracking breaks (data problem, travelers are fine)",
         "from_stage": "search", "dimension": "device", "value": "Android app", "real": False},
+    # Regional incidents: they light up the US-by-state and International dashboards.
+    "state_payment_outage": {
+        "label": "California: card payments fail at a regional gateway", "from_stage": "payment",
+        "dimension": "state", "value": "CA", "real": True},
+    "country_3ds_failure": {
+        "label": "United Kingdom: bank verification (3-D Secure) fails", "from_stage": "payment",
+        "dimension": "market", "value": "GB", "real": True},
 }
+PAYMENT_INCIDENTS = {"payment_decline_spike": 0.25, "state_payment_outage": 0.10,
+                     "country_3ds_failure": 0.10}
 
 INCIDENT_SECONDS = 35      # how long an injected incident lasts
 AUTO_GAP_SECONDS = 15      # calm time between auto-injected incidents
@@ -105,7 +119,7 @@ class SimulatorAgent:
 
     def _affects(self, journey: dict, kind: str) -> bool:
         inc = self.incident
-        return bool(inc and inc["type"] == kind and journey[inc["dimension"]] == inc["value"])
+        return bool(inc and inc["type"] == kind and journey.get(inc["dimension"]) == inc["value"])
 
     def supplier_down(self, supplier: str) -> bool:
         inc = self.incident
@@ -146,7 +160,7 @@ class SimulatorAgent:
         name = rng.choice(FIRST)
         j = {
             "id": f"J{next(self._ids)}", "ts": now,
-            "brand": _pick(rng, BRANDS), "market": _pick(rng, MARKETS),
+            "brand": _pick(rng, BRANDS), "market": _pick(rng, MARKETS), "state": None,
             "device": _pick(rng, DEVICES), "supplier": _pick(rng, SUPPLIERS),
             "payment_method": _pick(rng, PAYMENTS),
             # PII is never stored raw: hashed id + masked email only.
@@ -154,14 +168,18 @@ class SimulatorAgent:
             "email": _mask_email(name),
             "schema_ok": True, "reached": 0,
         }
+        if j["market"] == "US":
+            j["state"] = _pick(rng, US_STATES)
         # Walk the shopping funnel.
         reached = 0
         for idx, stage in enumerate(STAGES[:4]):
             rate = BASE_RATES[stage]
             if stage == "checkout" and self._affects(j, "price_mismatch"):
                 rate = 0.30
-            if stage == "payment" and self._affects(j, "payment_decline_spike"):
-                rate = 0.25
+            if stage == "payment":
+                for kind, bad_rate in PAYMENT_INCIDENTS.items():
+                    if self._affects(j, kind):
+                        rate = min(rate, bad_rate)
             if rng.random() < rate:
                 reached = idx + 1
             else:
@@ -178,7 +196,7 @@ class SimulatorAgent:
         if reached >= 4 and j["schema_ok"]:
             self._create_order(j, now)
         self.recent_events.append({
-            "ts": now, "id": j["id"], "brand": j["brand"], "market": j["market"],
+            "ts": now, "id": j["id"], "brand": j["brand"], "market": j["market"], "state": j["state"],
             "device": j["device"], "stage": STAGES[reached], "schema_ok": j["schema_ok"],
             "booked": reached >= 4,
         })
@@ -192,7 +210,7 @@ class SimulatorAgent:
         j["order_id"] = oid
         self.orders[oid] = {
             "id": oid, "journey": j["id"], "created": now, "supplier": j["supplier"],
-            "brand": j["brand"], "market": j["market"], "device": j["device"],
+            "brand": j["brand"], "market": j["market"], "state": j["state"], "device": j["device"],
             "payment_method": j["payment_method"], "traveler": j["traveler"], "email": j["email"],
             "checkin_hours": self.rng.choice([6, 18, 30, 48, 72, 120, 240]),
             "confirm_at": confirm_at, "status": "pending", "retries": 0,

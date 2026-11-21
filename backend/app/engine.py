@@ -118,9 +118,83 @@ class Engine:
                 "evals": self.evals.snapshot(now),
                 "diagnoses": [{k: v for k, v in d.items() if k != "anomaly"} | {"label": d["anomaly"]["label"]}
                               for d in self.rca.diagnoses[-3:][::-1]],
+                "regions": self.regions(),
                 "agents": AGENTS,
                 "tools": TOOL_TIERS,
             }
+
+
+    # ---------- regional dashboards ----------
+    def regions(self) -> dict:
+        """Roll the last 20s of journeys up by US state and by country.
+
+        Status is computed from the data only (never from the simulator's ground
+        truth): a region is "alert" when its search-to-booking conversion is far
+        below everyone else's AND the gap is statistically clear (z >= 4.5).
+        """
+        # Last 20s: short enough that a new problem shows up fast on screen.
+        journeys = [j for j in self.sim.journeys if j["schema_ok"] and j["ts"] >= self.now - 20]
+        orders = [o for o in self.sim.orders.values() if o["created"] >= self.now - 20]
+        stuck = [o for o in self.sim.orders.values() if o["status"] != "confirmed"
+                 and self.now - o["created"] > 5]
+        top = next((d["top"] for d in reversed(self.rca.diagnoses) if d.get("top")), None)
+        us = [j for j in journeys if j["market"] == "US"]
+        intl = [j for j in journeys if j["market"] != "US"]
+        return {
+            "us": _rollup(us, "state", [o for o in orders if o["market"] == "US"],
+                          [o for o in stuck if o["market"] == "US"], top),
+            "intl": _rollup(intl, "market", [o for o in orders if o["market"] != "US"],
+                            [o for o in stuck if o["market"] != "US"], top),
+        }
+
+
+SHOP_STAGES = ["Search", "Detail", "Checkout", "Payment", "Booked"]
+
+
+def _stage_counts(js: list[dict]) -> list[int]:
+    return [sum(1 for j in js if j["reached"] >= i) for i in range(5)]
+
+
+def _rollup(js: list[dict], key: str, orders: list[dict], stuck: list[dict], top: dict | None) -> dict:
+    total_conv = (sum(j["reached"] >= 4 for j in js) / len(js)) if js else 0
+    rows = []
+    for val in sorted({j[key] for j in js if j.get(key)}):
+        g = [j for j in js if j[key] == val]
+        rest = [j for j in js if j[key] != val]
+        conv = sum(j["reached"] >= 4 for j in g) / len(g)
+        rest_conv = (sum(j["reached"] >= 4 for j in rest) / len(rest)) if rest else conv
+        at_pay = sum(j["reached"] >= 3 for j in g)
+        paid = sum(j["reached"] >= 4 for j in g)
+        ratio = conv / rest_conv if rest_conv else 1
+        # z-score: how many standard errors below everyone else? Small regions are
+        # noisy, so a low ratio alone is not enough; it must be statistically clear.
+        se = (rest_conv * (1 - rest_conv) / len(g)) ** 0.5 if 0 < rest_conv < 1 else 0
+        z = (rest_conv - conv) / se if se else 0
+        status = "ok"
+        if z >= 4.5 and ratio < 0.6:
+            status = "alert"
+        elif z >= 3.5 and ratio < 0.75:
+            status = "watch"
+        flagged = bool(top and top["dimension"] == key and top["value"] == val)
+        rows.append({
+            "code": val, "searches": len(g), "bookings": paid,
+            "conversion": round(conv, 4), "vs_others": round(ratio, 2), "z": round(z, 1),
+            "payment_success": round(paid / at_pay, 3) if at_pay else None,
+            "stages": _stage_counts(g),
+            "revenue_usd": sum(o["value_usd"] for o in orders if o.get(key) == val),
+            "stuck_orders": sum(1 for o in stuck if o.get(key) == val),
+            "status": "alert" if flagged else status,
+            "agent_flag": (f"RootCauseAgent: {top['value']} explains the drop "
+                           f"({round(top['confidence'] * 100)}% confidence)") if flagged else None,
+        })
+    rows.sort(key=lambda r: -r["searches"])
+    return {
+        "searches": len(js), "bookings": sum(j["reached"] >= 4 for j in js),
+        "conversion": round(total_conv, 4),
+        "revenue_usd": sum(o["value_usd"] for o in orders),
+        "stuck_orders": len(stuck), "stage_labels": SHOP_STAGES, "stages": _stage_counts(js),
+        "alerts": sum(r["status"] == "alert" for r in rows), "rows": rows,
+    }
 
 
 def _public(a: dict) -> dict:

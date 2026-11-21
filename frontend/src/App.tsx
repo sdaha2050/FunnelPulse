@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Action, State } from "./types";
+import Regions from "./Regions";
 
 // Each agent gets a color so the conversation feed is easy to follow.
 const AGENT_COLORS: Record<string, string> = {
@@ -19,6 +20,15 @@ const INCIDENT_BUTTONS: { type: string; label: string }[] = [
   { type: "supplier_timeout", label: "Supplier stops confirming" },
   { type: "price_mismatch", label: "Price mismatch (iOS)" },
   { type: "tracking_outage", label: "Broken tracking (bad data)" },
+  { type: "state_payment_outage", label: "California payments fail" },
+  { type: "country_3ds_failure", label: "UK bank check fails" },
+];
+
+type Tab = "live" | "us" | "intl";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "live", label: "Live agents" },
+  { id: "us", label: "US by state" },
+  { id: "intl", label: "International" },
 ];
 
 const STEPS = [
@@ -44,6 +54,7 @@ export default function App() {
   const [s, setS] = useState<State | null>(null);
   const [error, setError] = useState(false);
   const [showHow, setShowHow] = useState(true);
+  const [tab, setTab] = useState<Tab>("live");
 
   // Poll the backend once a second. Simple and good enough for a demo.
   useEffect(() => {
@@ -117,6 +128,22 @@ export default function App() {
         </div>
         {error && <div className="pill bad">Connection lost, retrying…</div>}
       </div>
+
+      <nav className="tabs">
+        {TABS.map((t) => {
+          const alerts = t.id === "live" ? 0 : s.regions[t.id].alerts;
+          return (
+            <button key={t.id} className={tab === t.id ? "on" : ""} onClick={() => setTab(t.id)}>
+              {t.label}
+              {alerts > 0 && <span className="dot">{alerts}</span>}
+            </button>
+          );
+        })}
+      </nav>
+
+      {tab !== "live" && <Regions kind={tab} data={s.regions[tab]} />}
+
+      {tab === "live" && (<>
 
       <section className="card how">
         <button className="link" onClick={() => setShowHow(!showHow)}>
@@ -299,6 +326,7 @@ export default function App() {
           </ul>
         </section>
       </div>
+      </>)}
       <footer>Fake data only. No real Expedia systems or traveler data are used.</footer>
     </div>
   );

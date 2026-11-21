@@ -16,9 +16,9 @@ import threading
 
 from app.bus import Message, MessageBus
 
-DIMENSIONS = ["payment_method", "supplier", "device", "market", "brand"]
+DIMENSIONS = ["payment_method", "supplier", "device", "market", "state", "brand"]
 DIM_LABELS = {"payment_method": "payment method", "supplier": "supplier", "device": "device",
-              "market": "market", "brand": "brand"}
+              "market": "market", "state": "US state", "brand": "brand"}
 CONFIDENCE_THRESHOLD = 0.5
 MIN_SEGMENT = 15
 
@@ -32,6 +32,8 @@ def diagnose(sample: list[dict], baseline: float) -> dict:
     for dim in DIMENSIONS:
         values = {s.get(dim) for s in sample}
         for val in values:
+            if val is None:          # e.g. "state" only exists for US travelers
+                continue
             seg = [s for s in sample if s.get(dim) == val]
             rest = [s for s in sample if s.get(dim) != val]
             if len(seg) < MIN_SEGMENT or len(rest) < MIN_SEGMENT:

@@ -87,4 +87,32 @@ export interface State {
     bad_data_suppressed: number;
   };
   diagnoses: { summary: string; label: string; llm_summary?: string }[];
+  regions: { us: RegionRollup; intl: RegionRollup };
+}
+
+export interface RegionRow {
+  code: string;
+  searches: number;
+  bookings: number;
+  conversion: number;
+  vs_others: number;
+  z: number;
+  payment_success: number | null;
+  stages: number[];
+  revenue_usd: number;
+  stuck_orders: number;
+  status: "ok" | "watch" | "alert";
+  agent_flag: string | null;
+}
+
+export interface RegionRollup {
+  searches: number;
+  bookings: number;
+  conversion: number;
+  revenue_usd: number;
+  stuck_orders: number;
+  stage_labels: string[];
+  stages: number[];
+  alerts: number;
+  rows: RegionRow[];
 }

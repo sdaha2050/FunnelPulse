@@ -16,6 +16,8 @@ LABELED = [
     ("payment_decline_spike", "payment",         ("payment_method", "Amex")),
     ("supplier_timeout",      "booking_created", ("supplier", "SunStay Hotels")),
     ("price_mismatch",        "checkout",        ("device", "iOS app")),
+    ("state_payment_outage",  "payment",         ("state", "CA")),
+    ("country_3ds_failure",   "payment",         ("market", "GB")),
 ]
 
 
@@ -142,3 +144,17 @@ def test_bad_data_in_one_segment_does_not_hide_a_real_incident_elsewhere():
     sent = [a for a in e.guard.audit if a["action"] == "notify" and "SunStay" in a["title"]
             and a["decision"] == "allow"]
     assert sent, "real supplier alert was wrongly suppressed"
+
+
+def test_regional_dashboards_flag_the_right_region():
+    e = warm(7)
+    e.start_incident("state_payment_outage")
+    run(e, 15)
+    us = {r["code"]: r for r in e.state()["regions"]["us"]["rows"]}
+    assert us["CA"]["status"] == "alert"
+    assert all(r["status"] != "alert" for c, r in us.items() if c != "CA")
+    e.start_incident("country_3ds_failure")
+    run(e, 15)
+    intl = {r["code"]: r for r in e.state()["regions"]["intl"]["rows"]}
+    assert intl["GB"]["status"] == "alert"
+    assert "US" not in intl

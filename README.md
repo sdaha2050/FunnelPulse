@@ -23,6 +23,19 @@ A simple, demo-friendly multi-agent system: fake Expedia-style booking data stre
 5. **Needs a human**: refunds, rebookings and traveler messages wait for Approve / Reject.
 6. **Guardrails**: mishaps prevented (blocked price change, suppressed false alarm, retry cap, and more).
 7. **Evals**: live scores: detection recall, alert precision, time to detect, root-cause accuracy, auto-fix success, guardrail violations.
+8. **US by state** tab: a tile map of US states (traffic share ~60%), colored Normal / Watch / Problem, with KPIs, a per-state funnel vs the US average, and a table of every state.
+9. **International** tab: the same view by country (UK, Germany, France, Canada, Mexico, Japan, Australia, Spain, India).
+
+### Regional dashboards
+
+| | US by state | International |
+| --- | --- | --- |
+| Segments | 13 states with demo traffic (CA, TX, FL, NY, WA, ...) | 9 countries (GB, DE, FR, CA, MX, JP, AU, ES, IN) |
+| Problem to trigger | **California payments fail** (regional gateway) | **UK bank check fails** (3-D Secure) |
+| How a region turns red | Conversion far below the other regions **and** z-score >= 4.5, so random noise in small regions does not cause false alarms | same |
+| Agent link | RootCauseAgent also checks `state` and `market`, and its finding is shown on the region | same |
+
+![US by state](docs/us_dashboard.png)
 
 ## Architecture
 
@@ -146,7 +159,8 @@ cd backend && pytest -q        # 24 tests
 2. **(0:20)** Click **Payment declines**. In ~5–10s the Payment bar goes red. Read the root cause: *payment method = Amex*. Show the alert in "Handled by agents" and the **message travelers** card in "Needs a human". Click **Approve**.
 3. **(0:50)** Click **Supplier stops confirming**. Watch "Paid but not confirmed" fill up, agents retry automatically, then the guardrail **stops the 4th retry** and rebook cards appear for a human.
 4. **(1:20)** Click **Price mismatch (iOS)**. Point at Guardrails: the agent's tempting shortcut *"lower the iOS price"* is **blocked** (Tier 4).
-5. **(1:40)** Click **Broken tracking**. Data quality turns UNRELIABLE and the alert is **suppressed**: no false alarm. Finish on the **Evals** panel: everything graded against the truth, 0 violations.
+5. **(1:30)** Open **US by state**, click **California payments fail**: California turns red on the map, its funnel shows the drop at Payment, and RootCauseAgent names CA. Then **International** + **UK bank check fails** shows the same for the United Kingdom.
+6. **(1:50)** Click **Broken tracking**. Data quality turns UNRELIABLE and the alert is **suppressed**: no false alarm. Finish on the **Evals** panel: everything graded against the truth, 0 violations.
 
 ## Run locally
 
