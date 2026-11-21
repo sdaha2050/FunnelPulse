@@ -6,6 +6,8 @@ A simple, demo-friendly multi-agent system: fake Expedia-style booking data stre
 
 > Fake data only. No real Expedia systems or traveler data are used.
 
+**Live demo:** https://tripsentry.onrender.com
+
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/sdaha2050/FunnelPulse)
 
 ![TripSentry dashboard](docs/screenshot.png)
