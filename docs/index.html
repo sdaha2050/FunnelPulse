@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TripSentry: multi-agent booking funnel demo</title>
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; color: #0f172a; background: #f8fafc; }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 60px; }
+    h1 { font-size: 34px; margin: 0 0 8px; }
+    .lead { font-size: 18px; color: #475569; line-height: 1.5; max-width: 720px; }
+    .cta { display: flex; gap: 10px; margin: 20px 0 28px; flex-wrap: wrap; }
+    .cta a { text-decoration: none; padding: 10px 16px; border-radius: 10px; font-weight: 600; }
+    .primary { background: #1d4ed8; color: #fff; }
+    .secondary { background: #fff; color: #0f172a; border: 1px solid #e2e8f0; }
+    h2 { margin-top: 40px; font-size: 22px; }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .step { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; }
+    .step b { display: block; margin-bottom: 6px; }
+    .step span { color: #475569; font-size: 14px; line-height: 1.45; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    img { max-width: 100%; border: 1px solid #e2e8f0; border-radius: 12px; }
+    footer { margin-top: 40px; color: #64748b; font-size: 13px; }
+    @media (max-width: 720px) { .steps { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>TripSentry</h1>
+  <p class="lead">AI agents that watch every travel booking from search to check-in, catch where travelers
+    drop or reservations break, fix the safe things automatically, and ask a human for the rest.</p>
+  <div class="cta">
+    <a class="primary" href="REPLACE_WITH_LIVE_APP_URL">Open the live demo</a>
+    <a class="secondary" href="REPLACE_WITH_REPO_URL">View the code on GitHub</a>
+  </div>
+
+  <img src="screenshot.png" alt="TripSentry dashboard showing the live funnel, agent conversation, human approvals, guardrails and evals" />
+
+  <h2>How it works</h2>
+  <div class="steps">
+    <div class="step"><b>1. Ingest</b><span>A simulator streams fake Expedia, Hotels.com and Vrbo journeys every 0.5s, and can inject real-world incidents.</span></div>
+    <div class="step"><b>2. Check data</b><span>DataQualityAgent checks freshness, volume and schema. Broken data is marked unreliable so it never looks like a real drop.</span></div>
+    <div class="step"><b>3. Detect</b><span>FunnelMonitor finds conversion drops. ReservationIntegrity finds paid bookings the supplier never confirmed.</span></div>
+    <div class="step"><b>4. Diagnose</b><span>RootCauseAgent finds the segment behind a drop (payment method, supplier, device…) with evidence and a confidence score.</span></div>
+    <div class="step"><b>5. Act safely</b><span>ActionRouter picks a tier. Guardrails check every action. Safe fixes run; money, trips and traveler contact go to a human.</span></div>
+    <div class="step"><b>6. Learn</b><span>EvalAgent grades every agent against the ground truth: recall, precision, time to detect, root-cause accuracy, violations.</span></div>
+  </div>
+
+  <h2>Architecture</h2>
+  <div class="card">
+    <pre class="mermaid">
+flowchart LR
+  SIM[SimulatorAgent<br/>fake journeys + incidents] -->|events| BUS((Message bus))
+  BUS --> DQ[DataQualityAgent]
+  BUS --> FM[FunnelMonitorAgent]
+  BUS --> RI[ReservationIntegrityAgent]
+  FM -->|anomaly| RCA[RootCauseAgent]
+  RCA -->|diagnosis| AR[ActionRouterAgent]
+  RI -->|stuck bookings| AR
+  DQ -->|data status| GR
+  AR --> GR{Guardrails}
+  GR -->|Tier 1-2| TOOLS[Tools: notify, retry]
+  GR -->|Tier 3| HQ[Human approval]
+  GR -->|Tier 4| BLOCK[Blocked]
+  HQ --> TOOLS
+  SIM -. ground truth .-> EV[EvalAgent]
+  BUS --> UI[React dashboard]
+  EV --> UI
+    </pre>
+  </div>
+
+  <h2>Who decides what</h2>
+  <div class="card">
+    <table>
+      <tr><th>Tier</th><th>Examples</th><th>Decided by</th></tr>
+      <tr><td>0 Observe</td><td>Read data, compute metrics, diagnose</td><td>Agents</td></tr>
+      <tr><td>1 Notify</td><td>Page on-call (deduped, rate-limited)</td><td>Agents</td></tr>
+      <tr><td>2 Safe fix</td><td>Retry supplier confirmation (max 3, backoff)</td><td>Agents</td></tr>
+      <tr><td>3 Material</td><td>Rebook, refund, price-match credit, message travelers</td><td><b>Human</b></td></tr>
+      <tr><td>4 Prohibited</td><td>Change price, ranking, inventory, fraud rules</td><td><b>Never</b> (blocked twice)</td></tr>
+    </table>
+  </div>
+
+  <h2>Try these incidents</h2>
+  <div class="card">
+    <table>
+      <tr><th>Button</th><th>What happens</th></tr>
+      <tr><td>Payment declines</td><td>Payment bar turns red, root cause = Amex, a human approves a traveler message.</td></tr>
+      <tr><td>Supplier stops confirming</td><td>Agents retry 3 times, the guardrail stops the 4th, rebook requests go to a human.</td></tr>
+      <tr><td>Price mismatch (iOS)</td><td>Agent proposes "lower the price"; guardrails block it (Tier 4). Human decides on a price-match credit.</td></tr>
+      <tr><td>Broken tracking</td><td>Data marked unreliable, alert suppressed: no false alarm.</td></tr>
+    </table>
+  </div>
+
+  <footer>Fake data only. No real Expedia systems or traveler data are used. MIT licensed.</footer>
+</div>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "neutral" });
+</script>
+</body>
+</html>

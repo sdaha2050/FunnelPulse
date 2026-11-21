@@ -1,0 +1,14 @@
+# Render Blueprint: one web service, built from the Dockerfile.
+services:
+  - type: web
+    name: tripsentry
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: AUTO_INCIDENTS      # inject a demo incident every ~50s
+        value: "1"
+      - key: ANTHROPIC_API_KEY   # optional: LLM-written root-cause summaries
+        sync: false
