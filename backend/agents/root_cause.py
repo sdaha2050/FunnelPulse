@@ -47,11 +47,20 @@ def diagnose(sample: list[dict], baseline: float) -> dict:
             # big gap AND explains most of the loss = high confidence
             conf = round(min(0.99, explained * min(1.0, gap / 0.3)), 2)
             hyps.append({
-                "dimension": dim, "value": val, "confidence": conf,
+                "dimension": dim, "value": val, "confidence": conf, "gap": round(gap, 3),
                 "evidence": f"{val}: {r_seg:.0%} convert vs {r_rest:.0%} for other "
                             f"{DIM_LABELS[dim]}s (n={len(seg)})",
             })
-    hyps.sort(key=lambda h: h["confidence"], reverse=True)
+    # Tie-break on the gap: if two groups explain the loss equally well, the one that is
+    # much worse (more concentrated) is the more specific cause.
+    hyps.sort(key=lambda h: (h["confidence"], h["gap"]), reverse=True)
+    # Prefer the most specific group: among groups within 0.1 of the best score, the one
+    # that is much worse wins (e.g. "state = CA" beats "market = US", since CA is part of the US).
+    if hyps:
+        close = [h for h in hyps if h["confidence"] >= hyps[0]["confidence"] - 0.1]
+        best = max(close, key=lambda h: h["gap"])
+        hyps.remove(best)
+        hyps.insert(0, best)
     top = hyps[0] if hyps and hyps[0]["confidence"] >= CONFIDENCE_THRESHOLD else None
     return {"hypotheses": hyps[:3], "top": top, "rate": rate}
 

@@ -54,6 +54,8 @@ class Engine:
         self.tools = ToolRegistry(self.sim)
         self.router = ActionRouterAgent(self.bus, self.guard, self.tools, self.sim, self.integrity)
         self.evals = EvalAgent(self.bus, self.tools, lag_max=ingest_delay[1])
+        from app.trace import Tracer              # local import: trace.py imports lookup -> engine-free
+        self.tracer = Tracer(self.bus)
         self.now = 0.0
         self.started_wall = time.time()
         self.ticks = 0
@@ -73,6 +75,22 @@ class Engine:
     def start_incident(self, kind: str) -> dict:
         with self.lock:
             return self.sim.start_incident(kind, self.now)
+
+    def send_events(self, name: str, events: list[dict], skip_delay: bool = False) -> dict:
+        """Events sent by a person from the UI: same pipeline as everything else, plus a trace."""
+        with self.lock:
+            tid = self.tracer.new_id()
+            ingest = self.sim.ingest_custom(events, tid, self.now, skip_delay)
+            t = self.tracer.start(tid, name, events, ingest, skip_delay, self.now)
+            self.bus.publish("Traveler apps", "events.sent", {"trace_id": tid, "count": t["count"]},
+                             f"You sent {t['count']} event(s): '{t['name']}' (trace {tid})", to="Simulator")
+            return t
+
+    def set_auto_incidents(self, on: bool) -> None:
+        with self.lock:
+            self.sim.auto = on
+            if not on:
+                self.sim.clear_incident(self.now)
 
     def clear_incident(self) -> None:
         with self.lock:
@@ -108,6 +126,7 @@ class Engine:
                 "incident_types": {k: v["label"] for k, v in INCIDENTS.items()},
                 "data_quality": self.dq.snapshot(),
                 "pipeline": self.sim.pipeline_snapshot(now),
+                "settings": {"auto_incidents": self.sim.auto},
                 **self.funnel.snapshot(),
                 "events": list(self.sim.recent_events)[-20:][::-1],
                 "messages": [m.to_dict() for m in list(self.bus.log)[-60:]][::-1],

@@ -3,19 +3,13 @@ import type { Action, State } from "./types";
 import Regions from "./Regions";
 import Monthly from "./Monthly";
 import Pipeline from "./Pipeline";
+import SendEvents from "./SendEvents";
 import { Journey, OrderSearch } from "./Lookup";
 
-const INCIDENT_BUTTONS: { type: string; label: string }[] = [
-  { type: "payment_decline_spike", label: "Payment declines" },
-  { type: "supplier_timeout", label: "Supplier stops confirming" },
-  { type: "price_mismatch", label: "Price mismatch (iOS)" },
-  { type: "tracking_outage", label: "Broken tracking (bad data)" },
-  { type: "state_payment_outage", label: "California payments fail" },
-  { type: "country_3ds_failure", label: "UK bank check fails" },
-];
 
-type Tab = "live" | "us" | "intl" | "monthly" | "journey";
+type Tab = "send" | "live" | "us" | "intl" | "monthly" | "journey";
 const TABS: { id: Tab; label: string }[] = [
+  { id: "send", label: "▶ Send events" },
   { id: "live", label: "Live agents" },
   { id: "us", label: "US by state" },
   { id: "intl", label: "International" },
@@ -46,7 +40,7 @@ export default function App() {
   const [s, setS] = useState<State | null>(null);
   const [error, setError] = useState(false);
   const [showHow, setShowHow] = useState(true);
-  const [tab, setTab] = useState<Tab>("live");
+  const [tab, setTab] = useState<Tab>("send");
   const [journeyUser, setJourneyUser] = useState("");
   const [version, setVersion] = useState("");
   useEffect(() => { fetch("/api/version").then((r) => r.json()).then((d) => setVersion(d.version)).catch(() => {}); }, []);
@@ -94,14 +88,12 @@ export default function App() {
           </p>
         </div>
         <div className="controls">
-          <span className="label">Inject a problem:</span>
-          {INCIDENT_BUTTONS.map((b) => (
-            <button key={b.type} onClick={() => post(`/api/incidents/${b.type}`)}>
-              {b.label}
-            </button>
-          ))}
-          <button className="ghost" onClick={() => post("/api/incidents/clear")}>
-            Clear
+          <button
+            className={s.settings.auto_incidents ? "ghost" : "ghost off"}
+            onClick={() => post("/api/settings", { auto_incidents: !s.settings.auto_incidents })}
+            title="When ON, a ready-made problem is injected every ~50 seconds"
+          >
+            Random problems: {s.settings.auto_incidents ? "ON" : "OFF"}
           </button>
           <button
             className={killOn ? "danger" : "ghost"}
@@ -117,7 +109,9 @@ export default function App() {
         <div className={`pill ${s.incident ? (s.incident.real ? "bad" : "warn") : "ok"}`}>
           {s.incident
             ? `Active problem: ${s.incident.label} (${s.incident.seconds_left}s left)`
-            : "No injected problem right now (one is added automatically every ~50s)"}
+            : s.settings.auto_incidents
+              ? "No problem right now (a random one is added every ~50s)"
+              : "No problem right now (random problems are OFF: only your events cause problems)"}
         </div>
         <div className={`pill ${s.data_quality.reliable ? "ok" : "warn"}`}>
           Data quality: {s.data_quality.reliable ? "reliable" : `UNRELIABLE — ${s.data_quality.reason}`}
@@ -138,6 +132,7 @@ export default function App() {
       </nav>
 
       {(tab === "us" || tab === "intl") && <Regions kind={tab} data={s.regions[tab]} />}
+      {tab === "send" && <SendEvents s={s} onOpenUser={openUser} />}
       {tab === "monthly" && <Monthly />}
       {tab === "journey" && <Journey initial={journeyUser} />}
 

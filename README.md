@@ -28,6 +28,35 @@ A simple, demo-friendly multi-agent system: fake Expedia-style booking data stre
 
 10. **Monthly + top issues** tab: 12 months of simulated history (searches, bookings, conversion, booking value, lost bookings), a month picker, where bookings are lost by stage, and the **top 10 issues ranked by lost bookings**, each with root cause, evidence, which agent found it, fix, owner, status and a 12-month trend.
 
+### Send events (start here for a demo)
+
+The first tab lets you play the traveler apps. Pick one of 7 sample event sets, edit the JSON if you like, press **Send**, and follow the events through the platform:
+
+| Step | What it shows |
+| --- | --- |
+| 1. Received by the API | Events accepted (the API checks only their shape) |
+| 2. Event stream (Kafka) | Countdown while they travel (10–20s), then "landed" |
+| 3. Data quality | Required fields present, or data marked unreliable |
+| 4. Funnel monitor / Reservation check | Drop found (with rate, normal rate, z-score) or why not |
+| 5. Root cause | The group that explains the drop, its confidence, and whether it matches what you sent |
+| 6. Action router | The plan, by tier |
+| 7. Guardrails | Allowed, sent to a human, or blocked, and why |
+| 8. Outcome | Handled, waiting for you, or correctly ignored |
+
+| Sample | What should happen |
+| --- | --- |
+| One traveler books a hotel | Booked, supplier confirms, no action |
+| One traveler leaves at payment | No alert: one traveler leaving is normal |
+| 50 Amex payments fail | Drop at Payment → root cause Amex → alert (auto) + email to travelers (human) |
+| 60 iOS travelers abandon checkout | Drop at Checkout → iOS → price change **blocked**, price-match credit (human) |
+| 45 California travelers can't pay | Drop at Payment → state CA (US by state tab turns CA red) |
+| 8 bookings the hotel never confirms | Stuck after 10s → 3 retries each → rebooking (human) |
+| 60 events with missing session ID | Data unreliable → alerts held back, no false alarm |
+
+API: `GET /api/events/samples`, `POST /api/events` (`{"events": [...], "skip_delay": false}`), `GET /api/traces/{id}`.
+
+![Send events](docs/send_events.png)
+
 ### Live pipeline and ingestion delay
 
 The **Live agents** tab opens with a live pipeline diagram, which replaces the old agent chat feed:

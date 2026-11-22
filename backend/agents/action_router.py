@@ -6,6 +6,8 @@ Every proposal goes through the Guardrails first; only then does it run
 """
 from __future__ import annotations
 
+from collections import deque
+
 import itertools
 
 from app.bus import Message, MessageBus
@@ -34,6 +36,7 @@ class ActionRouterAgent:
         self._capped: set[str] = set()
         bus.subscribe("rca.diagnosis", self.on_diagnosis)
         bus.subscribe("funnel.recovered", self.on_recovered)
+        self.history: deque[dict] = deque(maxlen=4000)
 
     # ---------- building actions ----------
     def _action(self, type_, tier, title, owner, evidence, incident_key, severity="Sev 2",
@@ -149,6 +152,7 @@ class ActionRouterAgent:
         decision = self.guard.check(action, now, order)
         action["decision"] = decision
         action["ts"] = now
+        self.history.append(action)          # every proposed action, for the event trace view
         if decision["decision"] == "allow":
             try:
                 result = self.tools.run(action, now)

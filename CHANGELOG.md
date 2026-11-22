@@ -5,6 +5,7 @@ The version running live is shown at the bottom of the app and at `/api/version`
 
 | Version | Date | What changed | Commit |
 | --- | --- | --- | --- |
+| **v2.0.0** | 2026-11-22 | **Send events** tab (new first tab): pick sample events or edit JSON, press Send, and follow an 8-step trace with the reasoning for every agent decision. Random problems can be switched off; ready-made problems moved into this tab. Root cause prefers the most specific group (state over country). | (this release) |
 | **v1.4.1** | 2026-11-22 | Version history: this changelog, rollback guide, version shown in the app | `30034ee` |
 | **v1.4.0** | 2026-11-22 | Search by order ID in "Needs a human"; new **Traveler journey** tab (enter a user ID, see search → booked for each session) | `fc8cf12` |
 | **v1.3.0** | 2026-11-22 | **Live pipeline** diagram replaces the agent chat; clickstream data now lands **10–20s late** (`INGEST_DELAY`); evals split end-to-end vs agent reaction time | `61e87c1` |

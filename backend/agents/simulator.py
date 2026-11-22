@@ -166,8 +166,9 @@ class SimulatorAgent:
         self.in_flight.append({"event_ts": now, "land_at": now + self.current_lag(), "batch": batch,
                                "bookings": sum(1 for j in batch if j["reached"] >= 4)})
         landed = []
-        while self.in_flight and self.in_flight[0]["land_at"] <= now + 1e-9:
-            landed.append(self._land(self.in_flight.popleft(), now))
+        for item in [i for i in self.in_flight if i["land_at"] <= now + 1e-9]:   # sent events may skip the queue
+            self.in_flight.remove(item)
+            landed.append(self._land(item, now))
 
         # forget old data
         while self.journeys and self.journeys[0]["ts"] < now - 60:
@@ -204,6 +205,49 @@ class SimulatorAgent:
         self.bus.publish(self.name, "events.batch", {"batch": item["batch"], "lag": round(lag, 1)},
                          text, to="DataQualityAgent", log=log)
         return item
+
+    # ---------- events sent by a person from the UI ("Send events" tab) ----------
+    def ingest_custom(self, events: list[dict], trace_id: str, now: float, skip_delay: bool = False) -> dict:
+        """Turn sent events into journeys, mark them with a trace ID, and put them
+        into the same pipeline as everything else. Bookings go to the bookings DB now."""
+        batch = []
+        for ev in events:
+            for _ in range(int(ev.get("count", 1))):
+                j = self._journey_from_event(ev, now, trace_id)
+                batch.append(j)
+                if j["reached"] >= 4 and j["schema_ok"]:
+                    self._create_order(j, now)
+                    if ev.get("supplier_confirms") is False:
+                        self.orders[j["order_id"]].update(confirm_at=None, never_confirms=True)
+        land_at = now + (0.0 if skip_delay else self.current_lag())
+        self.in_flight.append({"event_ts": now, "land_at": land_at, "batch": batch, "trace_id": trace_id,
+                               "bookings": sum(1 for j in batch if j["reached"] >= 4)})
+        return {"journeys": [j["id"] for j in batch], "orders": [j["order_id"] for j in batch if j.get("order_id")],
+                "land_at": land_at}
+
+    def _journey_from_event(self, ev: dict, now: float, trace_id: str) -> dict:
+        jid = f"J{next(self._ids)}"
+        stage = ev.get("furthest_stage", "search")
+        reached = {"search": 0, "detail": 1, "checkout": 2, "payment": 3, "booked": 4}.get(stage, 0)
+        j = {"id": jid, "ts": now, "trace_id": trace_id,
+             "brand": ev.get("brand"), "market": ev.get("market"), "state": ev.get("state"),
+             "device": ev.get("device"),
+             # not given -> pick like real traffic, so it doesn't look like the cause
+             "supplier": ev.get("supplier") or _pick(self._detail_rng, SUPPLIERS),
+             "payment_method": ev.get("payment_method") or _pick(self._detail_rng, PAYMENTS),
+             "traveler": hashlib.sha256(f"{ev.get('user_id')}{jid}".encode()).hexdigest()[:10],
+             "email": _mask_email(str(ev.get("user_id") or "guest").lower()),
+             "user_id": (ev.get("user_id") or f"U{10000 + self._detail_rng.randrange(USER_POOL)}").upper(),
+             "session_id": ev["session_id"] if "session_id" in ev else f"S{jid[1:]}",
+             "reached": reached, "issue": None}
+        j["schema_ok"] = all(j.get(f) not in (None, "") for f in ("brand", "market", "device", "session_id"))
+        if not j["schema_ok"]:
+            j["reached"] = 0                     # broken tracking: nothing after search is recorded
+        secs = [0]
+        for lo, hi in STAGE_GAPS[:j["reached"]]:
+            secs.append(secs[-1] + self._detail_rng.randint(lo, hi))
+        j["stage_secs"] = secs
+        return j
 
     def pipeline_snapshot(self, now: float) -> dict:
         return {
@@ -304,7 +348,7 @@ class SimulatorAgent:
         if o["status"] == "confirmed":
             return True
         o["retries"] += 1
-        if self.supplier_down(o["supplier"]):
+        if self.supplier_down(o["supplier"]) or o.get("never_confirms"):
             return False
         if self.rng.random() < 0.85:
             o["confirm_at"] = now + 0.5

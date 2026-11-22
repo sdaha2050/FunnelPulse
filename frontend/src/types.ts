@@ -65,6 +65,7 @@ export interface State {
   incident: { type: string; label: string; real: boolean; seconds_left: number } | null;
   incident_types: Record<string, string>;
   data_quality: { reliable: boolean; reason: string; checks: Record<string, boolean>; lag_seconds: number };
+  settings: { auto_incidents: boolean };
   pipeline: {
     delay_range: number[];
     lag: number;
@@ -184,3 +185,9 @@ export interface SessionView {
 }
 
 export interface UserView { user_id: string; sessions: SessionView[]; booked: number; total: number }
+
+export interface TraceView {
+  id: string; name: string; sent_ago: number; count: number; events: object[]; done: boolean;
+  steps: { key: string; title: string; status: "done" | "warn" | "active" | "pending" | "skipped"; text: string; why: string }[];
+  orders: { id: string; label: string; tone: "ok" | "bad" | "wait"; user_id: string | null }[];
+}

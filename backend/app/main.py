@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app import lookup, monthly
+from app import lookup, monthly, trace
 from app.engine import TICK_SECONDS, Engine
 
 def _delay() -> tuple[float, float]:
@@ -50,6 +50,54 @@ class KillSwitch(BaseModel):
     global_on: bool | None = None
     action_type: str | None = None
     on: bool | None = None
+
+
+class SendEvents(BaseModel):
+    name: str = "Custom events"
+    events: list = []
+    skip_delay: bool = False
+
+
+@app.get("/api/events/samples")
+def event_samples():
+    """Ready-made events to send from the 'Send events' tab."""
+    return trace.SAMPLES
+
+
+@app.post("/api/events")
+def send_events(body: SendEvents):
+    """Ingest events sent by a person. Returns a trace ID to follow them through the agents."""
+    events, errors = trace.validate(body.events)
+    if errors:
+        raise HTTPException(422, {"errors": errors})
+    t = engine.send_events(body.name, events, body.skip_delay)
+    return {"trace_id": t["id"], "count": t["count"], "lands_in": round(max(0, t["land_at"] - engine.now))}
+
+
+@app.get("/api/traces")
+def list_traces():
+    with engine.lock:
+        return trace.traces_list(engine)
+
+
+@app.get("/api/traces/{trace_id}")
+def get_trace(trace_id: str):
+    """What every agent did with the sent events, with the reasoning."""
+    with engine.lock:
+        view = trace.trace_view(engine, trace_id.upper())
+    if not view:
+        raise HTTPException(404, f"No trace {trace_id}")
+    return view
+
+
+class Settings(BaseModel):
+    auto_incidents: bool
+
+
+@app.post("/api/settings")
+def set_settings(body: Settings):
+    engine.set_auto_incidents(body.auto_incidents)
+    return {"auto_incidents": body.auto_incidents}
 
 
 @app.get("/api/orders/{order_id}")
