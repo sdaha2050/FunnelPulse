@@ -167,3 +167,20 @@ export interface MonthlyData {
   ranked_on: string;
   issues: MonthlyIssue[];
 }
+
+export interface OrderView {
+  id: string; status: string; label: string; tone: "ok" | "bad" | "wait";
+  user_id: string | null; supplier: string; brand: string; market: string; state: string | null; device: string;
+  payment_method: string; value_usd: number; checkin_hours: number; retries: number;
+  traveler: string; email: string; age_seconds: number; pending_approval_id: string | null;
+  timeline: { ts: number; ago: number; who: string; text: string }[];
+}
+
+export interface SessionView {
+  session_id: string; outcome: string; why: string; issue: string | null;
+  brand: string; market: string; state: string | null; device: string; supplier: string; payment_method: string;
+  started_ago: number; order_id: string | null; in_pipeline: boolean; lands_in: number | null; lag: number | null;
+  steps: { name: string; state: "done" | "dropped" | "waiting" | "not_reached"; ago: number | null }[];
+}
+
+export interface UserView { user_id: string; sessions: SessionView[]; booked: number; total: number }

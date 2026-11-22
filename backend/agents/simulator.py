@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import itertools
 import random
-from collections import deque
+from collections import OrderedDict, deque
 
 from app.bus import MessageBus
 
@@ -63,6 +63,8 @@ INCIDENTS = {
 PAYMENT_INCIDENTS = {"payment_decline_spike": 0.25, "state_payment_outage": 0.10,
                      "country_3ds_failure": 0.10}
 
+USER_POOL = 5000           # demo travelers U10000-U14999; each one shops every ~40s
+STAGE_GAPS = [(5, 40), (20, 120), (15, 90), (2, 8)]   # seconds spent before detail/checkout/payment/booked
 INCIDENT_SECONDS = 35      # how long an injected incident lasts
 AUTO_GAP_SECONDS = 15      # calm time between auto-injected incidents
 
@@ -94,6 +96,11 @@ class SimulatorAgent:
         self.lag = (ingest_delay[0] + ingest_delay[1]) / 2
         self.in_flight: deque[dict] = deque()     # batches still travelling through the pipeline
         self.landed_events = 0
+        # Lookups for the UI: a traveler's recent sessions, and orders kept after the
+        # live view forgets them. Separate RNG so the traffic itself doesn't change.
+        self._detail_rng = random.Random(seed + 2)
+        self.user_index: dict[str, deque[dict]] = {}
+        self.order_archive: OrderedDict[str, dict] = OrderedDict()
         self.orders: dict[str, dict] = {}         # bookings waiting on / done with supplier
         self.recent_events: deque[dict] = deque(maxlen=30)
         self.incident: dict | None = None
@@ -168,7 +175,9 @@ class SimulatorAgent:
         for oid in [o for o, v in self.orders.items()
                     if (v["created"] < now - 120 and v["status"] in ("confirmed", "rebooked", "refunded"))
                     or v["created"] < now - 300]:          # keep the demo's memory small
-            del self.orders[oid]
+            self.order_archive[oid] = self.orders.pop(oid)   # still searchable by order ID
+        while len(self.order_archive) > 3000:
+            self.order_archive.popitem(last=False)
 
         return [j for item in landed for j in item["batch"]]
 
@@ -180,6 +189,7 @@ class SimulatorAgent:
             j["ts"] = now                 # when it reached the agents
             j["lag"] = round(lag, 1)
             self.journeys.append(j)
+            self.user_index.setdefault(j["user_id"], deque(maxlen=6)).append(j)
             self.recent_events.append({
                 "ts": now, "event_ts": j["event_ts"], "lag": round(lag, 1), "id": j["id"],
                 "brand": j["brand"], "market": j["market"], "state": j["state"], "device": j["device"],
@@ -217,6 +227,9 @@ class SimulatorAgent:
             "email": _mask_email(name),
             "schema_ok": True, "reached": 0,
         }
+        d = self._detail_rng
+        j["user_id"] = f"U{10000 + d.randrange(USER_POOL)}"
+        j["session_id"] = f"S{j['id'][1:]}"
         if j["market"] == "US":
             j["state"] = _pick(rng, US_STATES)
         # Walk the shopping funnel.
@@ -240,6 +253,21 @@ class SimulatorAgent:
             j["session_id"] = None
             reached = 0
         j["reached"] = reached
+        # seconds from the start of the session at which each stage was reached
+        secs = [0]
+        for lo, hi in STAGE_GAPS[:reached]:
+            secs.append(secs[-1] + d.randint(lo, hi))
+        j["stage_secs"] = secs
+        # Ground truth for the journey view: was this session hit by the active problem?
+        # Only where the problem bites (e.g. a payment problem only affects travelers
+        # who dropped at payment; a supplier problem only affects completed bookings).
+        inc = self.incident
+        hit = False
+        if inc and j.get(inc["dimension"]) == inc["value"]:
+            stage_idx = STAGES.index(inc["from_stage"])
+            hit = (not j["schema_ok"]) if inc["from_stage"] == "search" else (
+                reached >= 4 if stage_idx >= 4 else reached == stage_idx)
+        j["issue"] = inc["label"] if hit else None
 
         if reached >= 4 and j["schema_ok"]:
             self._create_order(j, now)
@@ -253,6 +281,7 @@ class SimulatorAgent:
         j["order_id"] = oid
         self.orders[oid] = {
             "id": oid, "journey": j["id"], "created": now, "supplier": j["supplier"],
+            "user_id": j["user_id"], "session_id": j["session_id"],
             "brand": j["brand"], "market": j["market"], "state": j["state"], "device": j["device"],
             "payment_method": j["payment_method"], "traveler": j["traveler"], "email": j["email"],
             "checkin_hours": self.rng.choice([6, 18, 30, 48, 72, 120, 240]),

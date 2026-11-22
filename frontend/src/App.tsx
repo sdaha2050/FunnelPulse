@@ -3,6 +3,7 @@ import type { Action, State } from "./types";
 import Regions from "./Regions";
 import Monthly from "./Monthly";
 import Pipeline from "./Pipeline";
+import { Journey, OrderSearch } from "./Lookup";
 
 const INCIDENT_BUTTONS: { type: string; label: string }[] = [
   { type: "payment_decline_spike", label: "Payment declines" },
@@ -13,12 +14,13 @@ const INCIDENT_BUTTONS: { type: string; label: string }[] = [
   { type: "country_3ds_failure", label: "UK bank check fails" },
 ];
 
-type Tab = "live" | "us" | "intl" | "monthly";
+type Tab = "live" | "us" | "intl" | "monthly" | "journey";
 const TABS: { id: Tab; label: string }[] = [
   { id: "live", label: "Live agents" },
   { id: "us", label: "US by state" },
   { id: "intl", label: "International" },
   { id: "monthly", label: "Monthly + top issues" },
+  { id: "journey", label: "Traveler journey" },
 ];
 
 const STEPS = [
@@ -45,6 +47,8 @@ export default function App() {
   const [error, setError] = useState(false);
   const [showHow, setShowHow] = useState(true);
   const [tab, setTab] = useState<Tab>("live");
+  const [journeyUser, setJourneyUser] = useState("");
+  const openUser = (uid: string) => { setJourneyUser(uid); setTab("journey"); };
 
   // Poll the backend once a second. Simple and good enough for a demo.
   useEffect(() => {
@@ -133,6 +137,7 @@ export default function App() {
 
       {(tab === "us" || tab === "intl") && <Regions kind={tab} data={s.regions[tab]} />}
       {tab === "monthly" && <Monthly />}
+      {tab === "journey" && <Journey initial={journeyUser} />}
 
       {tab === "live" && (<>
 
@@ -228,6 +233,7 @@ export default function App() {
           <h2>
             Needs a human <small>Tier 3: money, trips, or traveler contact</small>
           </h2>
+          <OrderSearch onOpenUser={openUser} />
           {s.approvals.length === 0 && <p className="muted">Nothing waiting. Inject a problem to see one.</p>}
           {s.approvals.map((a) => (
             <ApprovalCard key={a.id} a={a} />

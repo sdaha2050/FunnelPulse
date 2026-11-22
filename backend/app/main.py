@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app import monthly
+from app import lookup, monthly
 from app.engine import TICK_SECONDS, Engine
 
 def _delay() -> tuple[float, float]:
@@ -50,6 +50,33 @@ class KillSwitch(BaseModel):
     global_on: bool | None = None
     action_type: str | None = None
     on: bool | None = None
+
+
+@app.get("/api/orders/{order_id}")
+def get_order(order_id: str):
+    """Status and full history of one booking (search by order ID)."""
+    with engine.lock:
+        view = lookup.order_view(engine, order_id)
+    if not view:
+        raise HTTPException(404, f"No order {order_id} in the last few minutes of demo data")
+    return view
+
+
+@app.get("/api/users/{user_id}")
+def get_user(user_id: str):
+    """A traveler's recent sessions, from search to booked (journey view)."""
+    with engine.lock:
+        view = lookup.user_view(engine, user_id)
+    if not view:
+        raise HTTPException(404, f"No recent sessions for {user_id}")
+    return view
+
+
+@app.get("/api/lookup/samples")
+def get_samples():
+    """A few real IDs from the live demo to try in the search boxes."""
+    with engine.lock:
+        return lookup.samples(engine)
 
 
 @app.get("/api/monthly")
