@@ -1,11 +1,11 @@
 # Changelog
 
-Every version is a **git tag** (`v1.2.0`, `v1.3.0`, ...) on GitHub. To go back to one, see [ROLLBACK.md](ROLLBACK.md).
+Every version is pinned to a **commit ID** on GitHub (commits are permanent). To go back to one, see [ROLLBACK.md](ROLLBACK.md).
 The version running live is shown at the bottom of the app and at `/api/version`.
 
 | Version | Date | What changed | Commit |
 | --- | --- | --- | --- |
-| **v1.4.1** | 2026-11-22 | Version history: tags for every release, this changelog, rollback guide, version shown in the app | (this release) |
+| **v1.4.1** | 2026-11-22 | Version history: this changelog, rollback guide, version shown in the app | `30034ee` |
 | **v1.4.0** | 2026-11-22 | Search by order ID in "Needs a human"; new **Traveler journey** tab (enter a user ID, see search → booked for each session) | `fc8cf12` |
 | **v1.3.0** | 2026-11-22 | **Live pipeline** diagram replaces the agent chat; clickstream data now lands **10–20s late** (`INGEST_DELAY`); evals split end-to-end vs agent reaction time | `61e87c1` |
 | **v1.2.0** | 2026-11-21 | **Monthly + top issues** tab: 12-month simulated history, top 10 issues with root cause, fix, owner | `85c9987` |

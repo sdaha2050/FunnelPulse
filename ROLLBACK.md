@@ -1,7 +1,7 @@
 # How to roll back
 
-Every release is saved as a git tag (see [CHANGELOG.md](CHANGELOG.md)). Nothing is ever lost: rolling back just
-makes an older version live again. Pick the option that suits you.
+Every release is pinned to a commit ID (see the table in [CHANGELOG.md](CHANGELOG.md)). Commits on GitHub are
+permanent, so nothing is ever lost: rolling back just makes an older version live again. Pick the option that suits you.
 
 ## Option 1: Render dashboard (fastest, no code, about 1 minute)
 
@@ -19,19 +19,24 @@ On a computer with git installed:
 ```bash
 git clone https://github.com/sdaha2050/FunnelPulse.git
 cd FunnelPulse
-git checkout v1.3.0 -- .          # replace v1.3.0 with the version you want
+git checkout 61e87c1 -- .          # the commit ID of the version you want (v1.3.0 here)
 git commit -m "Roll back to v1.3.0"
 git push
 ```
 
 Render deploys it automatically in 1–2 minutes. History is kept, so you can roll forward again the same way
-(for example `git checkout v1.4.1 -- .`).
+(use the newer version's commit ID).
 
 ## Option 3: Look at or download an old version
 
-- See all versions: https://github.com/sdaha2050/FunnelPulse/tags
-- Each tag has **zip** and **tar.gz** download links with the full code of that version.
-- Compare two versions: `https://github.com/sdaha2050/FunnelPulse/compare/v1.3.0...v1.4.1`
+- See a version's code: `https://github.com/sdaha2050/FunnelPulse/tree/61e87c1` (any commit ID from the changelog)
+- Download it as a zip: `https://github.com/sdaha2050/FunnelPulse/archive/61e87c1.zip`
+- See what changed in it: `https://github.com/sdaha2050/FunnelPulse/commit/61e87c1`
+- Compare a version with today: `https://github.com/sdaha2050/FunnelPulse/compare/61e87c1...main`
+- Full history: https://github.com/sdaha2050/FunnelPulse/commits/main
+
+Optional: on GitHub you can also turn any version into a named release yourself (**Releases → Draft a new
+release → Choose a tag**, type `v1.3.0`, set **Target** to its commit ID, publish).
 
 ## Option 4: Ask Claude
 
