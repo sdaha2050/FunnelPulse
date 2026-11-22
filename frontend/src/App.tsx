@@ -4,13 +4,15 @@ import Regions from "./Regions";
 import Monthly from "./Monthly";
 import Pipeline from "./Pipeline";
 import SendEvents from "./SendEvents";
+import Assistant from "./Assistant";
 import { Journey, OrderSearch } from "./Lookup";
 
 
-type Tab = "send" | "live" | "us" | "intl" | "monthly" | "journey";
+type Tab = "send" | "live" | "assistant" | "us" | "intl" | "monthly" | "journey";
 const TABS: { id: Tab; label: string }[] = [
   { id: "send", label: "▶ Send events" },
   { id: "live", label: "Live agents" },
+  { id: "assistant", label: "💬 Traveler assistant" },
   { id: "us", label: "US by state" },
   { id: "intl", label: "International" },
   { id: "monthly", label: "Monthly + top issues" },
@@ -133,6 +135,7 @@ export default function App() {
 
       {(tab === "us" || tab === "intl") && <Regions kind={tab} data={s.regions[tab]} />}
       {tab === "send" && <SendEvents s={s} onOpenUser={openUser} />}
+      {tab === "assistant" && <Assistant s={s} />}
       {tab === "monthly" && <Monthly />}
       {tab === "journey" && <Journey initial={journeyUser} />}
 

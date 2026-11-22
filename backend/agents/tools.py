@@ -20,8 +20,22 @@ TOOL_TIERS = {
     "price_match_credit": 3,
     "rebook_traveler": 3,
     "refund": 3,
+    # Traveler assistant tools (Tier 1-2 run automatically, Tier 3 needs a human)
+    "create_ticket": 1,
+    "request_early_checkin": 2, "request_late_checkout": 2, "housekeeping_request": 2, "room_move": 2,
+    "create_booking": 2, "cancel_booking": 2, "modify_booking": 2, "send_invoice": 2, "add_loyalty_points": 2,
+    "goodwill_credit": 3,
     # Tier 4 tools (change_price, change_ranking, edit_fraud_rules) are
     # intentionally NOT registered.
+}
+
+
+ASSISTANT_DETAIL = {
+    "create_ticket": "Ticket sent to the hotel", "request_early_checkin": "Early check-in requested from the hotel",
+    "request_late_checkout": "Late checkout set until 1pm", "housekeeping_request": "Housekeeping dispatched",
+    "room_move": "Room move arranged", "create_booking": "Booking created and itinerary emailed",
+    "cancel_booking": "Booking cancelled, refund within policy issued", "modify_booking": "Booking updated",
+    "send_invoice": "Invoice emailed", "add_loyalty_points": "Loyalty points credited",
 }
 
 
@@ -58,7 +72,12 @@ class ToolRegistry:
         elif kind == "message_travelers":
             result["detail"] = "Message sent to affected travelers"
         elif kind == "price_match_credit":
-            result["detail"] = "Price-match credit applied for affected travelers"
+            result["detail"] = ("Price-match credit applied" if action.get("source") == "assistant"
+                                else "Price-match credit applied for affected travelers")
+        elif kind == "goodwill_credit":
+            result["detail"] = f"Goodwill credit of {action.get('impact') or 'the agreed amount'} applied"
+        elif kind in ASSISTANT_DETAIL:
+            result["detail"] = ASSISTANT_DETAIL[kind]
 
         self.executed.append({"ts": now, "type": kind, "tier": TOOL_TIERS[kind],
                               "approved_by": approved_by, "supplier_down": supplier_down, "order_id": action.get("order_id"),

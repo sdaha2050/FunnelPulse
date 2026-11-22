@@ -34,6 +34,8 @@ AGENTS = [
      "powers": "Can block anything"},
     {"name": "EvalAgent", "job": "Scores agents against ground truth in real time",
      "powers": "Tier 0: observe"},
+    {"name": "TravelAssistantAgent", "job": "Chats with travelers before, during and after a stay and acts for them",
+     "powers": "Tier 1-2 automatic; proposes Tier 3 (refunds, credits)"},
     {"name": "Human agent", "job": "Approves or rejects sensitive (Tier 3) actions",
      "powers": "Tier 3 approve"},
 ]
@@ -56,6 +58,8 @@ class Engine:
         self.evals = EvalAgent(self.bus, self.tools, lag_max=ingest_delay[1])
         from app.trace import Tracer              # local import: trace.py imports lookup -> engine-free
         self.tracer = Tracer(self.bus)
+        from app.concierge import TravelAssistant
+        self.assistant = TravelAssistant(self.bus, self.router)
         self.now = 0.0
         self.started_wall = time.time()
         self.ticks = 0
@@ -221,5 +225,5 @@ def _rollup(js: list[dict], key: str, orders: list[dict], stuck: list[dict], top
 
 def _public(a: dict) -> dict:
     keys = ("id", "type", "tier", "title", "owner", "evidence", "severity", "reason", "impact",
-            "status", "ts", "result", "note", "order_id", "decision")
+            "status", "ts", "result", "note", "order_id", "decision", "conv_id")
     return {k: a.get(k) for k in keys}

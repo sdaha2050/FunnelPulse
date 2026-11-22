@@ -90,6 +90,54 @@ def get_trace(trace_id: str):
     return view
 
 
+class ChatIn(BaseModel):
+    text: str = ""
+    phase: str = "pre"
+
+
+def _conv(cid: str) -> dict:
+    c = engine.assistant.convs.get(cid)
+    if not c:
+        raise HTTPException(404, "Conversation not found (it may have been reset)")
+    return c
+
+
+@app.post("/api/assistant/new")
+def assistant_new(body: ChatIn):
+    """Start a chat with the traveler assistant in a phase: pre, during or post."""
+    if body.phase not in ("pre", "during", "post"):
+        raise HTTPException(422, "phase must be pre, during or post")
+    with engine.lock:
+        return engine.assistant.view(engine.assistant.new(body.phase))
+
+
+@app.get("/api/assistant/{cid}")
+def assistant_get(cid: str):
+    with engine.lock:
+        return engine.assistant.view(_conv(cid))
+
+
+@app.post("/api/assistant/{cid}/message")
+def assistant_message(cid: str, body: ChatIn):
+    text = body.text.strip()[:500]
+    if not text:
+        raise HTTPException(422, "Empty message")
+    with engine.lock:
+        c = _conv(cid)
+        replies = engine.assistant.handle(c, text)
+        return {"replies": replies, **engine.assistant.view(c)}
+
+
+@app.post("/api/assistant/{cid}/phase")
+def assistant_phase(cid: str, body: ChatIn):
+    if body.phase not in ("pre", "during", "post"):
+        raise HTTPException(422, "phase must be pre, during or post")
+    with engine.lock:
+        c = _conv(cid)
+        engine.assistant.set_phase(c, body.phase)
+        return engine.assistant.view(c)
+
+
 class Settings(BaseModel):
     auto_incidents: bool
 

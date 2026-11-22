@@ -57,6 +57,20 @@ API: `GET /api/events/samples`, `POST /api/events` (`{"events": [...], "skip_del
 
 ![Send events](docs/send_events.png)
 
+### Traveler assistant (customer-facing agent)
+
+**Ava** chats with a traveler (Maya Patel, U12345, Gold member, trip to Harbor Inns Seattle, Dec 12–15) in three phases and takes real actions through the same router, guardrails and human queue as the other agents.
+
+| Phase | Sample messages | What Ava does |
+| --- | --- | --- |
+| Before the trip | find a pet-friendly hotel in Paris under $250 · flights · early check-in · breakfast/parking · price drop · free upgrade · cancel | Shows hotel/flight cards and books after an explicit "yes" (T2) · requests early check-in (T2) · **price-match credit goes to a human (T3)** · **free upgrade is blocked (T4)** · cancels within the free-cancellation policy (T2) |
+| During the stay | AC broken · room not cleaned · noise · late checkout · charged twice · locked out · extend stay · emergency | Maintenance ticket (T1) + room move (T2) · housekeeping (T2) · late checkout per Gold policy (T2) · **refund of a duplicate charge (T3)** · emergency: 911 guidance + Sev 1 page to the safety team |
+| After the stay | 5-star or 2-star feedback · lost item · invoice · missing points · refund for a closed restaurant | Thank-you points (T2) · complaint to the GM (T1) + **goodwill credit (T3)** · lost and found (T1) · invoice (T2) · **refund (T3)** |
+
+When a human approves or rejects in **Needs a human** (or in the assistant panel), Ava tells the traveler in the same chat. Intent detection is rule-based, so it works without an API key. API: `POST /api/assistant/new`, `POST /api/assistant/{id}/message`, `POST /api/assistant/{id}/phase`.
+
+![Traveler assistant](docs/assistant.png)
+
 ### Live pipeline and ingestion delay
 
 The **Live agents** tab opens with a live pipeline diagram, which replaces the old agent chat feed:

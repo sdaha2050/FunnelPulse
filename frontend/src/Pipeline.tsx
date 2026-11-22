@@ -12,6 +12,8 @@ export const AGENT_COLORS: Record<string, string> = {
   Guardrails: "#dc2626",
   EvalAgent: "#16a34a",
   "Human agent": "#ca8a04",
+  TravelAssistantAgent: "#db2777",
+  "Traveler apps": "#0f766e",
 };
 
 type NodeId = "apps" | "stream" | "dq" | "funnel" | "rca" | "db" | "integrity" | "router" | "guard" | "auto" | "human" | "evals";

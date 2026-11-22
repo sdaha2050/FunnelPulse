@@ -33,6 +33,7 @@ export interface Action {
   result?: { ok: boolean; detail: string };
   note?: string;
   decision?: { decision: string; rule: string | null; reason: string };
+  conv_id?: string | null;
 }
 
 export interface Message {
@@ -190,4 +191,16 @@ export interface TraceView {
   id: string; name: string; sent_ago: number; count: number; events: object[]; done: boolean;
   steps: { key: string; title: string; status: "done" | "warn" | "active" | "pending" | "skipped"; text: string; why: string }[];
   orders: { id: string; label: string; tone: "ok" | "bad" | "wait"; user_id: string | null }[];
+}
+
+export interface ChatAction { id: string; type: string; tier: number; title: string; decision: string; rule: string | null; reason: string }
+export interface ChatBrain { intent: string; confidence: number; slots: Record<string, unknown>; reasoning: string[]; actions: ChatAction[] }
+export interface ChatCard { kind: string; n: number; name: string; area: string; price: number; rating: number | null; perks: string[] }
+export interface ChatMsg { id: number; role: "user" | "agent"; text: string; cards?: ChatCard[]; quick?: string[]; brain?: ChatBrain | null }
+export interface ChatView {
+  id: string; phase: "pre" | "during" | "post";
+  traveler: { name: string; full_name: string; user_id: string; tier: string; card: string; email: string };
+  trip: Record<string, string | number>;
+  messages: ChatMsg[];
+  samples: Record<string, string[]>;
 }
