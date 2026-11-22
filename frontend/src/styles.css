@@ -157,3 +157,16 @@ table.issues .status { font-size: 11px; background: #f1f5f9; padding: 2px 8px; b
 tr.detail td { background: #f8fafc; }
 .rc { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; padding: 6px 0; font-size: 13px; line-height: 1.4; }
 .rc span { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+
+/* ---------- live pipeline ---------- */
+.pipeline .pipewrap { display: grid; grid-template-columns: minmax(0, 2.3fr) minmax(240px, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .pipeline .pipewrap { grid-template-columns: 1fr; } }
+.pipeline svg { width: 100%; height: auto; }
+.pchat h3 { margin: 0 0 6px; }
+.pchat ul { list-style: none; margin: 0; padding: 0; max-height: 380px; overflow: auto; font-size: 12.5px; }
+.pchat li { padding: 6px 8px; border-radius: 8px; border-bottom: 1px solid var(--line); line-height: 1.35; }
+.pchat li.new { background: #f8fafc; animation: fadein .6s; }
+.pchat .dot { display: inline-block; width: 8px; height: 8px; border-radius: 99px; margin-right: 6px; }
+.pchat .to { color: var(--muted); }
+@keyframes fadein { from { background: #e0f2fe; } }
+.events .lag { color: var(--muted); font-size: 11px; }

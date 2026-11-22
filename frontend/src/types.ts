@@ -64,10 +64,17 @@ export interface State {
   now: number;
   incident: { type: string; label: string; real: boolean; seconds_left: number } | null;
   incident_types: Record<string, string>;
-  data_quality: { reliable: boolean; reason: string; checks: Record<string, boolean> };
+  data_quality: { reliable: boolean; reason: string; checks: Record<string, boolean>; lag_seconds: number };
+  pipeline: {
+    delay_range: number[];
+    lag: number;
+    in_flight_events: number;
+    in_flight: { event_ts: number; land_at: number; count: number; bookings: number }[];
+    landed_events: number;
+  };
   funnel: FunnelStage[];
   anomalies: Anomaly[];
-  events: { ts: number; id: string; brand: string; market: string; device: string; stage: string; schema_ok: boolean; booked: boolean }[];
+  events: { ts: number; event_ts: number; lag: number; id: string; brand: string; market: string; device: string; stage: string; schema_ok: boolean; booked: boolean }[];
   messages: Message[];
   stuck_orders: { id: string; supplier: string; checkin_hours: number; retries: number; status: string; waiting_s: number }[];
   auto_actions: Action[];
@@ -83,10 +90,13 @@ export interface State {
   };
   evals: {
     scores: Score[];
-    incidents: { label: string; real: boolean; active: boolean; ttd: number | null; rca_correct: boolean | null; outcome: string }[];
+    incidents: { label: string; real: boolean; active: boolean; ttd: number | null; rca_correct: boolean | null; outcome: string; lag: number }[];
     bad_data_suppressed: number;
   };
-  diagnoses: { summary: string; label: string; llm_summary?: string }[];
+  diagnoses: {
+    summary: string; label: string; llm_summary?: string;
+    top: { dimension: string; value: string; confidence: number } | null;
+  }[];
   regions: { us: RegionRollup; intl: RegionRollup };
 }
 

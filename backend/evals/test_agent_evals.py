@@ -158,3 +158,27 @@ def test_regional_dashboards_flag_the_right_region():
     intl = {r["code"]: r for r in e.state()["regions"]["intl"]["rows"]}
     assert intl["GB"]["status"] == "alert"
     assert "US" not in intl
+
+
+# ---------- with the 10-20s ingestion delay used in the live demo ----------
+@pytest.mark.parametrize("kind", ["payment_decline_spike", "price_mismatch", "state_payment_outage"])
+def test_detects_through_ingestion_delay(kind):
+    e = Engine(seed=7, auto_incidents=False, ingest_delay=(10, 20))
+    for _ in range(80):
+        e.tick()
+    assert e.state()["pipeline"]["in_flight_events"] > 0, "events should be travelling through the pipeline"
+    e.start_incident(kind)
+    for _ in range(90):
+        e.tick()
+    card = e.evals.incidents[-1]
+    assert card["detected_at"] is not None
+    reaction = card["detected_at"] - card["started"] - card["lag"]
+    assert reaction <= 15, f"agents took {reaction:.1f}s after the data landed"
+    assert card["rca_correct"]
+
+
+def test_no_false_alarms_with_delay():
+    e = Engine(seed=42, auto_incidents=False, ingest_delay=(10, 20))
+    for _ in range(300):
+        e.tick()
+    assert e.evals.alerts_false == 0 and e.evals.alerts_true == 0

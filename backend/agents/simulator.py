@@ -80,12 +80,20 @@ class SimulatorAgent:
     name = "Simulator"
 
     def __init__(self, bus: MessageBus, seed: int = 7, journeys_per_tick: int = 60,
-                 auto_incidents: bool = True):
+                 auto_incidents: bool = True, ingest_delay: tuple[float, float] = (0.0, 0.0)):
         self.bus = bus
         self.rng = random.Random(seed)
         self.per_tick = journeys_per_tick
         self.auto = auto_incidents
-        self.journeys: deque[dict] = deque()      # last ~60s of journeys
+        self.journeys: deque[dict] = deque()      # last ~60s of journeys that have LANDED
+        # Ingestion pipeline (think Kafka -> stream processor): each batch of
+        # clickstream events lands 10-20s after it happened. Bookings/orders come
+        # from the bookings database and are real-time (no delay).
+        self.delay = ingest_delay
+        self._lag_rng = random.Random(seed + 1)   # separate RNG: same traffic with or without delay
+        self.lag = (ingest_delay[0] + ingest_delay[1]) / 2
+        self.in_flight: deque[dict] = deque()     # batches still travelling through the pipeline
+        self.landed_events = 0
         self.orders: dict[str, dict] = {}         # bookings waiting on / done with supplier
         self.recent_events: deque[dict] = deque(maxlen=30)
         self.incident: dict | None = None
@@ -103,7 +111,7 @@ class SimulatorAgent:
             raise ValueError(f"unknown incident {kind}")
         self.clear_incident(now)
         self.incident = {"type": kind, **INCIDENTS[kind], "started": now,
-                         "ends": now + INCIDENT_SECONDS}
+                         "ends": now + INCIDENT_SECONDS, "ingest_lag": round(self.current_lag(), 1)}
         self.bus.publish(self.name, "incident.started", dict(self.incident),
                          f"Injected test incident: {self.incident['label']}", to="EvalAgent")
         return self.incident
@@ -121,6 +129,9 @@ class SimulatorAgent:
         inc = self.incident
         return bool(inc and inc["type"] == kind and journey.get(inc["dimension"]) == inc["value"])
 
+    def current_lag(self) -> float:
+        return self.lag if self.delay[1] > 0 else 0.0
+
     def supplier_down(self, supplier: str) -> bool:
         inc = self.incident
         return bool(inc and inc["type"] == "supplier_timeout" and inc["value"] == supplier)
@@ -130,7 +141,8 @@ class SimulatorAgent:
         self._tick += 1
         if self.incident and now >= self.incident["ends"]:
             self.clear_incident(now)
-        if self.auto and not self.incident and now - self._last_incident_end >= AUTO_GAP_SECONDS \
+        # wait for the last incident's delayed data to finish landing, then a calm gap
+        if self.auto and not self.incident and now - self._last_incident_end >= AUTO_GAP_SECONDS + self.delay[1] \
                 and now > 20:
             kind = self._auto_order[self._auto_idx % len(self._auto_order)]
             self._auto_idx += 1
@@ -138,6 +150,17 @@ class SimulatorAgent:
 
         batch = [self._new_journey(now) for _ in range(self.per_tick)]
         self._advance_orders(now)
+
+        # Send the batch into the pipeline. The lag drifts slowly between the
+        # min and max (like consumer lag), so batches never overtake each other.
+        if self.delay[1] > 0:
+            lo, hi = self.delay
+            self.lag = min(hi, max(lo, self.lag + self._lag_rng.uniform(-0.4, 0.4)))
+        self.in_flight.append({"event_ts": now, "land_at": now + self.current_lag(), "batch": batch,
+                               "bookings": sum(1 for j in batch if j["reached"] >= 4)})
+        landed = []
+        while self.in_flight and self.in_flight[0]["land_at"] <= now + 1e-9:
+            landed.append(self._land(self.in_flight.popleft(), now))
 
         # forget old data
         while self.journeys and self.journeys[0]["ts"] < now - 60:
@@ -147,13 +170,39 @@ class SimulatorAgent:
                     or v["created"] < now - 300]:          # keep the demo's memory small
             del self.orders[oid]
 
-        # Announce ingestion every 2s so the agent feed isn't flooded.
-        log = self._tick % 4 == 0
-        bookings = sum(1 for j in batch if j["reached"] >= 4)
-        self.bus.publish(self.name, "events.batch", {"batch": batch},
-                         f"Ingested {len(batch)} traveler journeys ({bookings} bookings)",
-                         to="DataQualityAgent", log=log)
-        return batch
+        return [j for item in landed for j in item["batch"]]
+
+    def _land(self, item: dict, now: float) -> dict:
+        """A batch comes out of the pipeline: agents can see it from now on."""
+        lag = now - item["event_ts"]
+        for j in item["batch"]:
+            j["event_ts"] = j["ts"]       # when the traveler actually did it
+            j["ts"] = now                 # when it reached the agents
+            j["lag"] = round(lag, 1)
+            self.journeys.append(j)
+            self.recent_events.append({
+                "ts": now, "event_ts": j["event_ts"], "lag": round(lag, 1), "id": j["id"],
+                "brand": j["brand"], "market": j["market"], "state": j["state"], "device": j["device"],
+                "stage": STAGES[j["reached"]], "schema_ok": j["schema_ok"], "booked": j["reached"] >= 4,
+            })
+        self.landed_events += len(item["batch"])
+        # Announce ingestion every 5s so the agent feed isn't flooded.
+        log = self._tick % 10 == 0
+        text = f"Ingested {len(item['batch'])} traveler journeys ({item['bookings']} bookings)"
+        if lag > 0:
+            text += f", {lag:.0f}s after they happened"
+        self.bus.publish(self.name, "events.batch", {"batch": item["batch"], "lag": round(lag, 1)},
+                         text, to="DataQualityAgent", log=log)
+        return item
+
+    def pipeline_snapshot(self, now: float) -> dict:
+        return {
+            "delay_range": list(self.delay), "lag": round(self.current_lag(), 1),
+            "in_flight_events": sum(len(i["batch"]) for i in self.in_flight),
+            "in_flight": [{"event_ts": i["event_ts"], "land_at": i["land_at"], "count": len(i["batch"]),
+                           "bookings": i["bookings"]} for i in self.in_flight],
+            "landed_events": self.landed_events,
+        }
 
     def _new_journey(self, now: float) -> dict:
         rng = self.rng
@@ -191,15 +240,9 @@ class SimulatorAgent:
             j["session_id"] = None
             reached = 0
         j["reached"] = reached
-        self.journeys.append(j)
 
         if reached >= 4 and j["schema_ok"]:
             self._create_order(j, now)
-        self.recent_events.append({
-            "ts": now, "id": j["id"], "brand": j["brand"], "market": j["market"], "state": j["state"],
-            "device": j["device"], "stage": STAGES[reached], "schema_ok": j["schema_ok"],
-            "booked": reached >= 4,
-        })
         return j
 
     def _create_order(self, j: dict, now: float) -> None:

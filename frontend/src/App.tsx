@@ -2,19 +2,7 @@ import { useEffect, useState } from "react";
 import type { Action, State } from "./types";
 import Regions from "./Regions";
 import Monthly from "./Monthly";
-
-// Each agent gets a color so the conversation feed is easy to follow.
-const AGENT_COLORS: Record<string, string> = {
-  Simulator: "#64748b",
-  DataQualityAgent: "#0891b2",
-  FunnelMonitorAgent: "#2563eb",
-  ReservationIntegrityAgent: "#7c3aed",
-  RootCauseAgent: "#c026d3",
-  ActionRouterAgent: "#ea580c",
-  Guardrails: "#dc2626",
-  EvalAgent: "#16a34a",
-  "Human agent": "#ca8a04",
-};
+import Pipeline from "./Pipeline";
 
 const INCIDENT_BUTTONS: { type: string; label: string }[] = [
   { type: "payment_decline_spike", label: "Payment declines" },
@@ -166,9 +154,11 @@ export default function App() {
         )}
       </section>
 
+      <Pipeline s={s} />
+
       <div className="grid two">
         <section className="card">
-          <h2>Live booking funnel <small>last 10 seconds</small></h2>
+          <h2>Live booking funnel <small>last 10 seconds of data that has landed</small></h2>
           <div className="funnel">
             {s.funnel.map((f) => {
               const anomaly = anomalyByTarget.get(f.stage);
@@ -202,12 +192,13 @@ export default function App() {
         </section>
 
         <section className="card">
-          <h2>Data coming in <small>fake ingestion</small></h2>
+          <h2>Data coming in <small>as it lands, with its delay</small></h2>
           <ul className="events">
             {s.events.map((e) => (
               <li key={e.id} className={!e.schema_ok ? "broken" : e.booked ? "booked" : ""}>
                 <code>{e.id}</code> {e.brand} · {e.market} · {e.device} →{" "}
                 {e.schema_ok ? (e.booked ? "booked ✓" : `left at ${e.stage}`) : "missing fields ✗"}
+                {e.lag > 0 && <span className="lag"> · {Math.round(e.lag)}s late</span>}
               </li>
             ))}
           </ul>
@@ -233,21 +224,6 @@ export default function App() {
       </div>
 
       <div className="grid two">
-        <section className="card">
-          <h2>Agents talking to each other</h2>
-          <ul className="chat">
-            {s.messages.slice(0, 30).map((m) => (
-              <li key={m.id}>
-                <span className="who" style={{ color: AGENT_COLORS[m.sender] || "#334155" }}>
-                  {m.sender}
-                </span>
-                <span className="to">→ {m.to}</span>
-                <span className="txt">{m.text}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
         <section className="card human">
           <h2>
             Needs a human <small>Tier 3: money, trips, or traveler contact</small>
@@ -272,9 +248,6 @@ export default function App() {
             </>
           )}
         </section>
-      </div>
-
-      <div className="grid three">
         <section className="card">
           <h2>Handled by agents <small>Tier 1–2</small></h2>
           <ul className="small">
@@ -287,6 +260,9 @@ export default function App() {
           </ul>
         </section>
 
+      </div>
+
+      <div className="grid two">
         <section className="card">
           <h2>Guardrails <small>{s.guardrails.mishaps_total} mishaps prevented</small></h2>
           {s.guardrails.mishaps.length === 0 && <p className="muted">No risky actions attempted yet.</p>}
@@ -322,6 +298,7 @@ export default function App() {
                 <div className="muted">
                   {c.outcome}
                   {c.ttd != null && ` in ${c.ttd}s`}
+                  {c.ttd != null && c.lag > 0 && ` (${Math.round(c.lag)}s of it was data delay)`}
                   {c.rca_correct != null && ` · root cause ${c.rca_correct ? "correct" : "wrong"}`}
                 </div>
               </li>

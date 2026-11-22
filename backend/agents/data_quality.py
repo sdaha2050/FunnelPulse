@@ -28,6 +28,7 @@ class DataQualityAgent:
         self._recent: deque[tuple[float, int, int]] = deque(maxlen=8)  # (ts, total, broken)
         self._last_bad_ts = -999.0
         self.checks = {"freshness": True, "volume": True, "schema": True}
+        self.lag: float = 0.0          # how far behind real time the data is
         bus.subscribe("events.batch", self.on_batch)
 
     def on_batch(self, msg: Message) -> None:
@@ -37,6 +38,7 @@ class DataQualityAgent:
                   or j.get("session_id", "ok") is None]
         self._recent.append((now, len(batch), len(broken)))
         self.last_batch_ts = now
+        self.lag = msg.payload.get("lag", 0.0)
 
         total = sum(t for _, t, _ in self._recent)
         bad = sum(b for _, _, b in self._recent)
@@ -68,4 +70,5 @@ class DataQualityAgent:
         self.checks["freshness"] = ok
 
     def snapshot(self) -> dict:
-        return {"reliable": self.reliable, "reason": self.reason, "checks": dict(self.checks)}
+        return {"reliable": self.reliable, "reason": self.reason, "checks": dict(self.checks),
+                "lag_seconds": self.lag}

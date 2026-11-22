@@ -40,10 +40,12 @@ AGENTS = [
 
 
 class Engine:
-    def __init__(self, seed: int = 7, auto_incidents: bool = True):
+    def __init__(self, seed: int = 7, auto_incidents: bool = True,
+                 ingest_delay: tuple[float, float] = (0.0, 0.0)):
         self.lock = threading.RLock()
         self.bus = MessageBus()
-        self.sim = SimulatorAgent(self.bus, seed=seed, auto_incidents=auto_incidents)
+        self.sim = SimulatorAgent(self.bus, seed=seed, auto_incidents=auto_incidents,
+                                  ingest_delay=ingest_delay)
         self.dq = DataQualityAgent(self.bus, expected_per_batch=self.sim.per_tick)
         self.guard = Guardrails(self.bus)
         self.funnel = FunnelMonitorAgent(self.bus)
@@ -51,7 +53,7 @@ class Engine:
         self.rca = RootCauseAgent(self.bus)
         self.tools = ToolRegistry(self.sim)
         self.router = ActionRouterAgent(self.bus, self.guard, self.tools, self.sim, self.integrity)
-        self.evals = EvalAgent(self.bus, self.tools)
+        self.evals = EvalAgent(self.bus, self.tools, lag_max=ingest_delay[1])
         self.now = 0.0
         self.started_wall = time.time()
         self.ticks = 0
@@ -105,6 +107,7 @@ class Engine:
                               "seconds_left": round(inc["ends"] - now)} if inc else None),
                 "incident_types": {k: v["label"] for k, v in INCIDENTS.items()},
                 "data_quality": self.dq.snapshot(),
+                "pipeline": self.sim.pipeline_snapshot(now),
                 **self.funnel.snapshot(),
                 "events": list(self.sim.recent_events)[-20:][::-1],
                 "messages": [m.to_dict() for m in list(self.bus.log)[-60:]][::-1],

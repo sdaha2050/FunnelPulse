@@ -11,13 +11,17 @@ from agents.guardrails import RETRY_CAP
 from agents.tools import ToolRegistry
 
 GRACE = 12.0           # an alert this soon after an incident ends still counts as true
+                       # (plus the ingestion delay: an incident's data keeps landing after it ends)
+REACTION_TARGET = 15   # seconds from "data landed" to "agents detected it"
 
 
 class EvalAgent:
     name = "EvalAgent"
 
-    def __init__(self, bus: MessageBus, tools: ToolRegistry):
+    def __init__(self, bus: MessageBus, tools: ToolRegistry, lag_max: float = 0.0):
         self.bus, self.tools = bus, tools
+        self.lag_max = lag_max
+        self.grace = GRACE + lag_max
         self.incidents: list[dict] = []        # scorecards, newest last
         self.current: dict | None = None
         self.alerts_true = 0
@@ -34,7 +38,7 @@ class EvalAgent:
     def _active(self, now: float) -> dict | None:
         """Incident that is active, or ended within the grace period."""
         for card in reversed(self.incidents):
-            if card["ended"] is None or now - card["ended"] <= GRACE:
+            if card["ended"] is None or now - card["ended"] <= self.grace:
                 return card
         return None
 
@@ -43,7 +47,9 @@ class EvalAgent:
         card = {"type": p["type"], "label": p["label"], "real": p["real"], "from_stage": p["from_stage"],
                 "truth": {"dimension": p["dimension"], "value": p["value"]}, "started": p["started"],
                 "ended": None, "detected_at": None, "rca_correct": None, "false_alerts": 0,
-                "suppressed": 0}
+                "suppressed": 0,
+                # bookings DB is real-time; clickstream data arrives after the ingestion delay
+                "lag": 0.0 if p["type"] == "supplier_timeout" else p.get("ingest_lag", 0.0)}
         self.incidents.append(card)
         self.incidents[:] = self.incidents[-20:]
 
@@ -114,9 +120,10 @@ class EvalAgent:
         return bad
 
     def scores(self, now: float) -> list[dict]:
-        real = [c for c in self.incidents if c["real"] and (c["ended"] or now - c["started"] >= 15)]
+        real = [c for c in self.incidents if c["real"] and (c["ended"] or now - c["started"] >= 15 + self.lag_max)]
         detected = [c for c in real if c["detected_at"] is not None]
         ttd = [c["detected_at"] - c["started"] for c in detected]
+        reaction = [max(0.0, c["detected_at"] - c["started"] - c["lag"]) for c in detected]
         # Retries against a supplier that is down are expected to fail; score the rest.
         retries = [e for e in self.tools.executed
                    if e["type"] == "retry_confirmation" and not e.get("supplier_down")]
@@ -132,8 +139,12 @@ class EvalAgent:
              "Real incidents the agents caught"),
             ("Alert precision", pct(self.alerts_true, alerts), ">= 90%", lambda v: v >= 90, "%",
              "Alerts that were about a real problem"),
-            ("Avg time to detect", round(sum(ttd) / len(ttd), 1) if ttd else None, "<= 15s",
-             lambda v: v <= 15, "s", "From incident start to first detection"),
+            ("Time to detect (end to end)", round(sum(ttd) / len(ttd), 1) if ttd else None,
+             f"<= {REACTION_TARGET + self.lag_max:.0f}s", lambda v: v <= REACTION_TARGET + self.lag_max, "s",
+             "From the problem starting to first detection, including the data delay"),
+            ("Agent reaction time", round(sum(reaction) / len(reaction), 1) if reaction else None,
+             f"<= {REACTION_TARGET}s", lambda v: v <= REACTION_TARGET, "s",
+             "From the data landing to first detection (agents' own speed)"),
             ("Root-cause accuracy", pct(sum(1 for c in diagnosed if c["rca_correct"]), len(diagnosed)), ">= 80%", lambda v: v >= 80, "%",
              "Diagnoses that named the true segment"),
             ("Auto-fix success", pct(len(fixed), len(retries)), ">= 70%", lambda v: v >= 70, "%",
@@ -152,6 +163,6 @@ class EvalAgent:
                        else "Detected" if c["detected_at"] else "Not detected yet")
             cards.append({"label": c["label"], "real": c["real"], "active": c["ended"] is None,
                           "ttd": round(c["detected_at"] - c["started"], 1) if c["detected_at"] else None,
-                          "rca_correct": c["rca_correct"], "outcome": outcome})
+                          "rca_correct": c["rca_correct"], "outcome": outcome, "lag": c["lag"]})
         return {"scores": self.scores(now), "incidents": cards,
                 "bad_data_suppressed": self.bad_data_suppressed}

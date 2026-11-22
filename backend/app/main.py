@@ -15,7 +15,14 @@ from pydantic import BaseModel
 from app import monthly
 from app.engine import TICK_SECONDS, Engine
 
-engine = Engine(auto_incidents=os.environ.get("AUTO_INCIDENTS", "1") == "1")
+def _delay() -> tuple[float, float]:
+    """INGEST_DELAY="10-20" = clickstream data lands 10-20s after it happens ("0" = off)."""
+    raw = os.environ.get("INGEST_DELAY", "10-20")
+    lo, _, hi = raw.partition("-")
+    return float(lo), float(hi or lo)
+
+
+engine = Engine(auto_incidents=os.environ.get("AUTO_INCIDENTS", "1") == "1", ingest_delay=_delay())
 
 
 async def _run_loop():

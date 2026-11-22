@@ -28,6 +28,20 @@ A simple, demo-friendly multi-agent system: fake Expedia-style booking data stre
 
 10. **Monthly + top issues** tab: 12 months of simulated history (searches, bookings, conversion, booking value, lost bookings), a month picker, where bookings are lost by stage, and the **top 10 issues ranked by lost bookings**, each with root cause, evidence, which agent found it, fix, owner, status and a 12-month trend.
 
+### Live pipeline and ingestion delay
+
+The **Live agents** tab opens with a live pipeline diagram, which replaces the old agent chat feed:
+
+- **Event stream (Kafka) conveyor:** each blue tick is a batch of traveler events travelling through the pipeline. Clickstream data reaches the agents **10–20s after it happens** (the delay drifts slowly, like real consumer lag), so a new problem appears on the funnel only after that delay.
+- **Bookings DB:** bookings and supplier confirmations come straight from the bookings database in real time, so stuck bookings are caught without the delay.
+- **Agent messages:** every message on the bus becomes a colored dot travelling along the arrow from sender to receiver (each agent has its own color). The sender's box lights up, and the "Agents talking" list shows the text.
+- **Boxes show live status:** data reliable or not, where the drop is, the root cause and its confidence, stuck bookings, blocked actions, humans waiting, and eval targets met.
+- **Evals split time to detect:** *end to end*, including the data delay (target <= 35s), and *agent reaction time* after the data lands (target <= 15s).
+
+Set the delay with the `INGEST_DELAY` environment variable: `10-20` by default, `0` to turn it off.
+
+![Live pipeline](docs/pipeline.png)
+
 ### Top 10 issues (simulated, ranked on the last full month)
 
 | # | Issue | Stage | Root cause | Fix |
