@@ -48,6 +48,8 @@ export default function App() {
   const [showHow, setShowHow] = useState(true);
   const [tab, setTab] = useState<Tab>("live");
   const [journeyUser, setJourneyUser] = useState("");
+  const [version, setVersion] = useState("");
+  useEffect(() => { fetch("/api/version").then((r) => r.json()).then((d) => setVersion(d.version)).catch(() => {}); }, []);
   const openUser = (uid: string) => { setJourneyUser(uid); setTab("journey"); };
 
   // Poll the backend once a second. Simple and good enough for a demo.
@@ -313,7 +315,10 @@ export default function App() {
         </section>
       </div>
       </>)}
-      <footer>Fake data only. No real Expedia systems or traveler data are used.</footer>
+      <footer>
+        Fake data only. No real Expedia systems or traveler data are used.
+        {version && <> · TripSentry v{version} · <a href="https://github.com/sdaha2050/FunnelPulse/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">what changed</a></>}
+      </footer>
     </div>
   );
 }

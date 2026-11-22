@@ -85,6 +85,15 @@ def get_monthly():
     return monthly.build()
 
 
+VERSION = (Path(__file__).resolve().parents[2] / "VERSION")
+
+
+@app.get("/api/version")
+def get_version():
+    """The release that is running (see CHANGELOG.md)."""
+    return {"version": VERSION.read_text().strip() if VERSION.exists() else "dev"}
+
+
 @app.get("/api/health")
 async def health():
     return {"ok": True, "ticks": engine.ticks}
